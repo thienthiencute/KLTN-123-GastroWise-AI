@@ -14,9 +14,10 @@ import os
 import io
 from PIL import Image
 from ultralytics import YOLO
+import requests
 
 # --- CẤU HÌNH ---
-MONGO_URI = "mongodb://localhost:27017/" 
+MONGO_URI = os.getenv("MONGODB_URI", "mongodb+srv://thienthien:GastroWise2026@cluster01.adts0oq.mongodb.net/gastrowise?appName=Cluster01")
 DB_NAME = "gastrowise"      
 COLLECTION_NAME = "restaurants"
 
@@ -45,6 +46,23 @@ class SentimentRequest(BaseModel):
 class SentimentResponse(BaseModel):
     label: str
     score: float
+
+class WeatherRecommendRequest(BaseModel):
+    user_gps: Optional[List[float]] = None
+    temperature: Optional[float] = None
+    weather_condition: Optional[str] = None
+
+class WeatherInfo(BaseModel):
+    temperature: float
+    condition_text: str
+    condition_code: int
+    banner_title: str
+    banner_desc: str
+    weather_type: str
+
+class WeatherRecommendResponse(BaseModel):
+    weather: WeatherInfo
+    scores: List[TasteScore]
 
 # --- LOGIC APP ---
 print("--- KHỞI ĐỘNG SERVER AI (FINAL PRODUCTION - FIX HANOI SEARCH) ---")
@@ -350,11 +368,9 @@ def calculate_distance(lat1, lon1, lat2, lon2):
         return R * c
     except: return 999.0
 
-# --- STARTUP ---
-@app.on_event("startup")
-async def startup_event():
-    global df, tfidf_vectorizer, sentiment_pipeline, yolo_model
-    print("-> Đang load dữ liệu...")
+def load_dataset_from_mongo():
+    global df, tfidf_vectorizer
+    print("-> Đang kết nối và load dữ liệu từ MongoDB Atlas...")
     try:
         client = MongoClient(MONGO_URI)
         collection = client[DB_NAME][COLLECTION_NAME]
@@ -385,11 +401,18 @@ async def startup_event():
             df = temp_df
             tfidf_vectorizer = TfidfVectorizer()
             tag_matrix = tfidf_vectorizer.fit_transform(df['tags'])
-            print(f"-> Load thành công {len(df)} quán ăn.")
-            
+            print(f"-> Load thành công {len(df)} quán ăn vào bộ nhớ AI.")
+            return True
     except Exception as e:
         print(f"!!! Lỗi Critical khi load DB: {e}")
         df = pd.DataFrame()
+        return False
+
+# --- STARTUP ---
+@app.on_event("startup")
+async def startup_event():
+    global df, tfidf_vectorizer, sentiment_pipeline, yolo_model
+    load_dataset_from_mongo()
 
     try:
         sentiment_pipeline = pipeline("sentiment-analysis", model="5CD-AI/Vietnamese-Sentiment-visobert")
@@ -405,11 +428,16 @@ async def startup_event():
 
 @app.get("/")
 async def root():
+    if df is None or df.empty:
+        load_dataset_from_mongo()
     status = "Active" if df is not None and not df.empty else "Empty Data"
-    return {"status": "AI Service Running", "data_status": status}
+    count = len(df) if df is not None else 0
+    return {"status": "AI Service Running", "data_status": status, "restaurants_loaded": count}
 
 @app.post("/recommend", response_model=RecommendResponse)
 async def handle_recommendation(request_data: RecommendRequest):
+    if df is None or df.empty:
+        load_dataset_from_mongo()
     if df is None or df.empty:
         raise HTTPException(status_code=503, detail="Database chưa sẵn sàng")
     
@@ -665,7 +693,87 @@ async def handle_chat(request_data: ChatRequest):
         "reply_text": reply,
         "data": top_results
     }
-# ... (Phần if __name__ == "__main__": giữ nguyên)
+
+# --- WEATHER AI RECOMMENDATION ---
+WEATHER_FOOD_MATRIX = {
+    "rainy": {
+        "tags": ["lẩu", "lẩu thái", "lẩu bò", "phở", "bún bò", "nướng", "bbq", "mì cay", "chè nóng", "súp", "bò kho", "cháo"],
+        "condition_text": "Mưa rào / Trầm lắng",
+        "banner_title": "🌧️ Trời đang mưa lạnh ({temp}°C)",
+        "banner_desc": "Thời tiết lý tưởng để thưởng thức Lẩu Thái, Phở Nóng, Bún Bò & Nướng BBQ nghi ngút khói!"
+    },
+    "hot": {
+        "tags": ["trà sữa", "sinh tố", "nước ép", "kem", "bingsu", "chè", "gỏi cuốn", "chay", "máy lạnh", "trà chanh", "bún", "cơm tấm"],
+        "condition_text": "Trời nắng nóng",
+        "banner_title": "☀️ Trời nắng nóng ({temp}°C)",
+        "banner_desc": "Giải nhiệt ngay với Trà Sữa, Sinh Tố, Nước Ép tươi mát & các quán ăn có máy lạnh thoáng mát!"
+    },
+    "cool": {
+        "tags": ["cà phê", "ăn vặt", "bánh mì", "cơm niêu", "bún chả", "pizza", "sushi", "vỉa hè", "trà"],
+        "condition_text": "Thời tiết mát mẻ / Dễ chịu",
+        "banner_title": "🌤️ Thời tiết dễ chịu ({temp}°C)",
+        "banner_desc": "Thời điểm hoàn hảo để dạo phố, uống Cà Phê & thưởng thức các món ăn vặt thơm ngon!"
+    }
+}
+
+def get_realtime_weather(lat: float, lon: float):
+    try:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+        resp = requests.get(url, timeout=3)
+        if resp.status_code == 200:
+            cw = resp.json().get("current_weather", {})
+            temp = float(cw.get("temperature", 28.0))
+            code = int(cw.get("weathercode", 0))
+            return temp, code
+    except Exception as e:
+        print(f"Lỗi Open-Meteo API: {e}")
+    return 28.0, 0
+
+@app.post("/weather-recommend", response_model=WeatherRecommendResponse)
+async def handle_weather_recommend(request_data: WeatherRecommendRequest):
+    if df is None or df.empty:
+        load_dataset_from_mongo()
+    if df is None or df.empty:
+        raise HTTPException(status_code=503, detail="Database chưa sẵn sàng")
+    
+    lat = 10.7769
+    lon = 106.7009
+    if request_data.user_gps and len(request_data.user_gps) == 2:
+        lat, lon = request_data.user_gps[0], request_data.user_gps[1]
+        
+    temp, code = get_realtime_weather(lat, lon)
+    if request_data.temperature is not None:
+        temp = request_data.temperature
+        
+    rain_codes = [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99]
+    if code in rain_codes or temp < 24.0:
+        w_type = "rainy"
+    elif temp >= 30.0:
+        w_type = "hot"
+    else:
+        w_type = "cool"
+        
+    meta = WEATHER_FOOD_MATRIX[w_type]
+    target_tags = meta["tags"]
+    
+    w_info = WeatherInfo(
+        temperature=round(temp, 1),
+        condition_text=meta["condition_text"],
+        condition_code=code,
+        banner_title=meta["banner_title"].format(temp=round(temp, 1)),
+        banner_desc=meta["banner_desc"],
+        weather_type=w_type
+    )
+    
+    query = " ".join(target_tags[:5])
+    rec_req = RecommendRequest(query=query, user_gps=[lat, lon])
+    rec_res = await handle_recommendation(rec_req)
+    
+    scores_list = rec_res["scores"]
+    return {
+        "weather": w_info,
+        "scores": scores_list
+    }
 
 if __name__ == "__main__":
     uvicorn.run("api:app", host="127.0.0.1", port=5000, reload=True)
