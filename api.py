@@ -16,7 +16,7 @@ from PIL import Image
 from ultralytics import YOLO
 
 # --- CẤU HÌNH ---
-MONGO_URI = "mongodb://localhost:27017/" 
+MONGO_URI = "mongodb+srv://thienthien:GastroWise2026@cluster01.adts0oq.mongodb.net/?appName=Cluster01"
 DB_NAME = "gastrowise"      
 COLLECTION_NAME = "restaurants"
 
