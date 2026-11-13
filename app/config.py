@@ -1,12 +1,11 @@
 import os
 
 # --- MONGODB CONFIG ---
-MONGO_URI = os.getenv(
-    "MONGODB_URI",
-    "mongodb+srv://thienthien:GastroWise2026@cluster01.adts0oq.mongodb.net/gastrowise?appName=Cluster01"
-)
-DB_NAME = "gastrowise"
-COLLECTION_NAME = "restaurants"
+# [TASK-SEC-01] Remediated: Never hardcode database credentials.
+# Require MONGODB_URI via environment variables (.env)
+MONGO_URI = os.getenv("MONGODB_URI")
+DB_NAME = os.getenv("MONGODB_DB_NAME", "gastrowise")
+COLLECTION_NAME = os.getenv("MONGODB_COLLECTION_NAME", "restaurants")
 
 # --- TAG KNOWLEDGE BASE ---
 TAG_KNOWLEDGE_BASE = {
