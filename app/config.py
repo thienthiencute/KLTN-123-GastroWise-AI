@@ -1,8 +1,28 @@
 import os
+from pathlib import Path
+
+# --- LOAD ENVIRONMENT VARIABLES (.env) ---
+# [TASK-SEC-01] Ensure .env is loaded safely without hardcoded secrets
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.is_file():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(dotenv_path=_env_path)
+    except ImportError:
+        # Zero-dependency fallback parser for local .env files
+        with open(_env_path, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    _k = _k.strip()
+                    _v = _v.strip().strip('"').strip("'")
+                    if _k and _k not in os.environ:
+                        os.environ[_k] = _v
 
 # --- MONGODB CONFIG ---
 # [TASK-SEC-01] Remediated: Never hardcode database credentials.
-# Require MONGODB_URI via environment variables (.env)
+# Require MONGODB_URI via environment variables (.env or system env)
 MONGO_URI = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("MONGODB_DB_NAME", "gastrowise")
 COLLECTION_NAME = os.getenv("MONGODB_COLLECTION_NAME", "restaurants")

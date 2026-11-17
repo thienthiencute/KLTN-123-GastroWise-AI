@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 from pymongo import MongoClient
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -7,6 +8,13 @@ from app.core.text_utils import clean_coordinate, clean_price, extract_district_
 # Global dataset & model state
 df = None
 tfidf_vectorizer = None
+
+def sanitize_log_message(msg: str) -> str:
+    """Mask credentials and connection strings in log output."""
+    if not msg:
+        return ""
+    # Mask user:pass in mongodb URIs
+    return re.sub(r'mongodb(\+srv)?:\/\/[^@]+@', r'mongodb\1://[REDACTED_AUTH]@', str(msg))
 
 def extract_coords_from_row(row):
     """
@@ -30,8 +38,8 @@ def extract_coords_from_row(row):
 def load_dataset_from_mongo():
     global df, tfidf_vectorizer
     print("-> [MongoDB Loader] Đang kết nối và load dữ liệu từ MongoDB...")
-    if not MONGO_URI:
-        print("-> [MongoDB Loader] CẢNH BÁO BẢO MẬT: MONGODB_URI chưa được thiết lập trong biến môi trường. Khởi tạo dataset rỗng.")
+    if not MONGO_URI or "<username>" in MONGO_URI or "<password>" in MONGO_URI:
+        print("-> [MongoDB Loader] CẢNH BÁO BẢO MẬT: MONGODB_URI chưa được thiết lập hoặc đang chứa placeholder. Khởi tạo dataset rỗng an toàn.")
         df = pd.DataFrame(columns=['id', 'name', 'tags', 'rating', 'price', 'lat', 'lon', 'district', 'address'])
         tfidf_vectorizer = TfidfVectorizer()
         return False
@@ -73,7 +81,7 @@ def load_dataset_from_mongo():
             print(f"-> [MongoDB Loader] Load thành công {len(df)} quán ăn vào bộ nhớ AI (GeoJSON Aware).")
             return True
     except Exception as e:
-        print(f"!!! Lỗi Critical khi load DB: {e}")
+        print(f"!!! Lỗi Critical khi load DB: {sanitize_log_message(str(e))}")
         df = pd.DataFrame()
         tfidf_vectorizer = None
         return False
