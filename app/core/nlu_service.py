@@ -1,6 +1,6 @@
 import re
 from typing import Dict, Any, List, Optional, Tuple
-from app.core.vision_service import VIETNAMESE_FOOD_NUTRITION
+from app.core.nutrition_data import VIETNAMESE_FOOD_NUTRITION
 from app.core.recommender import recommend_restaurants, recommend_hybrid
 from app.schemas.recommendation import HybridRecommendRequest, RecommendRequest
 
@@ -22,11 +22,12 @@ DISTRICT_PATTERNS = {
 def extract_budget_slot(text: str) -> Optional[int]:
     """Trích xuất ngân sách (ví dụ: 'dưới 200k', '300.000', '150k')"""
     text_lower = text.lower()
-    match = re.search(r'(\d+)\s*(k|nghìn|ngàn|tram|trăm)', text_lower)
+    # [Fix budget regex] 'k' không được nối liền với chữ cái tiếng Việt (tránh nhầm 'quận 3 khoảng' thành 3k)
+    match = re.search(r'(\d+)\s*(k(?![a-zA-Z\u00C0-\u024F\u1EA0-\u1EF9])|nghìn|ngàn|tram|trăm)', text_lower)
     if match:
         val = int(match.group(1))
         unit = match.group(2)
-        if unit in ['k', 'nghìn', 'ngàn']:
+        if unit.startswith('k') or unit in ['nghìn', 'ngàn']:
             return val * 1000
         if unit in ['tram', 'trăm']:
             return val * 100000

@@ -58,6 +58,17 @@ def load_dataset_from_mongo():
             rename_map = {'tenQuan': 'name', 'diemTrungBinh': 'rating', 'giaCa': 'price', 'diaChi': 'address'}
             temp_df.rename(columns=rename_map, inplace=True)
             
+            # [TASK-IMP-02 / P1-001] Chuẩn hóa điểm Foody thang 10 về thang 5 sao tối đa
+            def normalize_rating(val):
+                try:
+                    r = float(val)
+                    if r > 5.0:
+                        return round(r / 2.0, 1)
+                    return round(r, 1)
+                except (ValueError, TypeError):
+                    return 3.0
+            temp_df['rating'] = temp_df['rating'].apply(normalize_rating)
+            
             temp_df['tags'] = temp_df['tags'].apply(lambda x: " ".join(x) if isinstance(x, list) else str(x)).fillna('')
             
             # Trích xuất tọa độ GeoJSON / lat-lon
