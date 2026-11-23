@@ -1,10 +1,90 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-.env
+*.so
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments (RẤT QUAN TRỌNG - tránh đẩy hàng GB packages)
+.venv/
+.venv*/
 venv/
-env/
 ENV/
+env/
+env.bak/
+venv.bak/
+
+# Environment Variables & Secrets
+.env
+.env.*
+.env*.local
+!.env.example
+
+# Ultralytics / YOLO & ML training artifacts
+runs/
+wandb/
+.ultralytics/
+*.pt.cache
+*.onnx
+
+# Testing & Coverage
+.cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.coverage
+.coverage.*
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# IDEs & Editors
 .idea/
 .vscode/
-*.log
+*.swp
+*.swo
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Agent & AI Assistant Temporary Files
+.gemini/
+.antigravity/
+.temp/
+.tempmediaStorage/
+scratch/
+implementation_plan.md
+walkthrough.md
+task.md
+task_plan.md
+scratchpad_*.md
+*.temp.md
