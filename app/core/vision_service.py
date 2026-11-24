@@ -1,5 +1,8 @@
 import io
-import cv2
+try:
+    import cv2
+except (ImportError, Exception):
+    cv2 = None
 import numpy as np
 from PIL import Image
 from ultralytics import YOLO
@@ -52,6 +55,8 @@ def preprocess_image_clahe(image: Image.Image) -> Image.Image:
     Áp dụng cân bằng sáng cục bộ thích nghi (CLAHE) để cải thiện độ tương phản
     cho ảnh chụp trong điều kiện ánh sáng yếu tại quán ăn.
     """
+    if cv2 is None:
+        return image
     try:
         img_np = np.array(image.convert('RGB'))
         # Chuyển sang không gian màu LAB

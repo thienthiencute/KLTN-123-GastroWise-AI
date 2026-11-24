@@ -10,6 +10,7 @@ from app.config import (
 from app.core.text_utils import translate_query, calculate_distance
 from app.db.mongo import get_dataset, get_vectorizer
 from app.core.collaborative_filter import cf_engine
+from app.core.rating_normalizer import normalize_rating, RatingScale
 from app.schemas.recommendation import (
     RecommendRequest, HybridRecommendRequest, 
     HybridRecommendResponse, HybridRecommendItem
@@ -148,11 +149,13 @@ def recommend_restaurants(request_data: RecommendRequest):
     # Dietary Exclusions Filter
     if dietary_exclusions:
         for exclusion in dietary_exclusions:
-            ex_lower = exclusion.lower()
-            if 'chay' in ex_lower:
-                chay_mask = filtered_df['tags'].str.contains('chay|vegan|vegetarian', case=False, na=False)
-                if chay_mask.any():
-                    filtered_df = filtered_df[chay_mask]
+            ex_lower = exclusion.strip().lower()
+            if 'chay' in ex_lower or 'vegetarian' in ex_lower or 'vegan' in ex_lower:
+                filtered_df = filtered_df[filtered_df['tags'].str.contains('chay|vegan|vegetarian|nấm|rau củ', case=False, na=False)]
+            elif 'không cay' in ex_lower:
+                filtered_df = filtered_df[~filtered_df['tags'].str.contains('cay|sa tế|mì cay|ớt', case=False, na=False)]
+            elif 'halal' in ex_lower:
+                filtered_df = filtered_df[filtered_df['tags'].str.contains('halal|muslim', case=False, na=False)]
     
     if locations_to_filter:
         city_filters = [loc for loc in locations_to_filter if loc in MAJOR_CITIES]
@@ -243,27 +246,55 @@ def recommend_restaurants(request_data: RecommendRequest):
 
     final_candidates = filtered_df
 
-    # STEP 5: SORTING
+    # Deduplicate candidates by id and by name & address
+    final_candidates = final_candidates.drop_duplicates(subset=['id'], keep='first')
+    if 'address' in final_candidates.columns:
+        final_candidates = final_candidates.drop_duplicates(subset=['name', 'address'], keep='first')
+
+    # Normalize rating safely
+    if 'rating' in final_candidates.columns:
+        final_candidates['rating'] = final_candidates['rating'].apply(lambda x: normalize_rating(x, default=3.0))
+    else:
+        final_candidates['rating'] = 3.0
+
+    final_candidates['distance_km'] = pd.to_numeric(final_candidates['distance_km'], errors='coerce').fillna(999.0)
+    final_candidates['price'] = pd.to_numeric(final_candidates['price'], errors='coerce').fillna(50000).astype(int)
+
+    # STEP 5: SORTING (Deterministic with secondary & tie-breaker keys)
     sort_by = "relevance"
     query_lower = processed_query.lower()
     
     if "gần" in query_lower:
         sort_by = "distance"
-        final_candidates = final_candidates.sort_values('distance_km', ascending=True)
+        final_candidates = final_candidates.sort_values(
+            by=['distance_km', 'S_taste', 'rating', 'id'],
+            ascending=[True, False, False, True]
+        )
     elif "rẻ" in query_lower:
         sort_by = "price"
-        final_candidates = final_candidates.sort_values('price', ascending=True)
+        final_candidates = final_candidates.sort_values(
+            by=['price', 'S_taste', 'rating', 'id'],
+            ascending=[True, False, False, True]
+        )
     elif any(x in query_lower for x in ['ngon', 'tốt nhất', 'nổi tiếng', 'rating', 'đánh giá']):
         sort_by = "rating"
-        final_candidates = final_candidates.sort_values('rating', ascending=False)
+        final_candidates = final_candidates.sort_values(
+            by=['rating', 'S_taste', 'distance_km', 'id'],
+            ascending=[False, False, True, True]
+        )
     else:
-        final_candidates = final_candidates.sort_values('S_taste', ascending=False)
+        final_candidates = final_candidates.sort_values(
+            by=['S_taste', 'rating', 'distance_km', 'id'],
+            ascending=[False, False, True, True]
+        )
         
     scores_list = []
     for _, row in final_candidates.head(64).iterrows():
         dist = float(row.get('distance_km', 999.0))
         taste_sc = float(row.get('S_taste', 0.0))
         d_match = bool(row.get('dish_match', False))
+        raw_p = row.get('price', 50000)
+        clean_p = 50000 if (raw_p is None or pd.isna(raw_p)) else int(raw_p)
         
         explanation = generate_recommendation_explanation(
             taste_score=taste_sc,
@@ -278,7 +309,7 @@ def recommend_restaurants(request_data: RecommendRequest):
             "tags": str(row['tags']),
             "S_taste": round(taste_sc, 3),
             "distance_km": round(dist, 2),
-            "price": int(row['price']),
+            "price": clean_p,
             "explanation": explanation
         })
         
@@ -333,20 +364,20 @@ def recommend_hybrid(request: HybridRecommendRequest) -> HybridRecommendResponse
     else:
         current_df['distance_km'] = 1.0 # fallback default
 
-    # 1.1 Dietary Constraint Exclusions
+    # Deduplicate candidate base by id and (name, address)
+    current_df = current_df.drop_duplicates(subset=['id'], keep='first')
+    if 'address' in current_df.columns:
+        current_df = current_df.drop_duplicates(subset=['name', 'address'], keep='first')
+
+    # 1.1 Dietary Constraint Exclusions (Strict filtering)
     for exclusion in dietary_exclusions:
         ex_clean = exclusion.strip().lower()
         if 'chay' in ex_clean or 'vegetarian' in ex_clean or 'vegan' in ex_clean:
-            chay_mask = current_df['tags'].str.contains('chay|vegan|vegetarian|nấm|rau củ', case=False, na=False)
-            if chay_mask.any():
-                current_df = current_df[chay_mask]
+            current_df = current_df[current_df['tags'].str.contains('chay|vegan|vegetarian|nấm|rau củ', case=False, na=False)]
         elif 'không cay' in ex_clean:
-            non_spicy_mask = ~current_df['tags'].str.contains('cay|sa tế|mì cay|ớt', case=False, na=False)
-            current_df = current_df[non_spicy_mask]
+            current_df = current_df[~current_df['tags'].str.contains('cay|sa tế|mì cay|ớt', case=False, na=False)]
         elif 'halal' in ex_clean:
-            halal_mask = current_df['tags'].str.contains('halal|muslim', case=False, na=False)
-            if halal_mask.any():
-                current_df = current_df[halal_mask]
+            current_df = current_df[current_df['tags'].str.contains('halal|muslim', case=False, na=False)]
 
     # 1.2 Price Cap Filter
     if request.max_price and request.max_price > 0:
@@ -381,7 +412,7 @@ def recommend_hybrid(request: HybridRecommendRequest) -> HybridRecommendResponse
         r_tags = str(row.tags)
         r_name = str(row.name)
         dist = float(getattr(row, 'distance_km', 1.0))
-        rating = float(getattr(row, 'rating', 4.5))
+        rating = normalize_rating(getattr(row, 'rating', None), default=3.5)
 
         # 2.1 Taste DNA Cosine Similarity
         if taste_vector is not None:
@@ -403,8 +434,9 @@ def recommend_hybrid(request: HybridRecommendRequest) -> HybridRecommendResponse
         lambda_dist = 0.12
         dist_penalty = lambda_dist * math.log(1.0 + max(0.0, dist))
 
-        # Final Composite Score Formula
-        s_composite = (w1_taste * s_taste) + (w2_cf * r_cf) + (w3_env * s_env) - dist_penalty
+        # Final Composite Score Formula with Rating Quality Factor
+        rating_bonus = 0.05 * (rating / 5.0)
+        s_composite = (w1_taste * s_taste) + (w2_cf * r_cf) + (w3_env * s_env) + rating_bonus - dist_penalty
 
         # Explanation Justification Synthesis
         reasons_list = []
@@ -440,16 +472,32 @@ def recommend_hybrid(request: HybridRecommendRequest) -> HybridRecommendResponse
     current_df['match_reasons'] = all_reasons
 
     # -------------------------------------------------------------------------
-    # STAGE 4: RANKING, EXPLAINABILITY & DEDUPLICATION
+    # STAGE 4: RANKING, EXPLAINABILITY & DEDUPLICATION (Deterministic)
     # -------------------------------------------------------------------------
-    sorted_df = current_df.sort_values(by='s_composite', ascending=False)
+    if 'rating' not in current_df.columns:
+        current_df['rating'] = 3.5
+    else:
+        current_df['rating'] = current_df['rating'].apply(lambda x: normalize_rating(x, default=3.5))
+
+    sorted_df = current_df.sort_values(
+        by=['s_composite', 's_taste', 'rating', 'id'],
+        ascending=[False, False, False, True]
+    )
     limit = request.limit or 10
     top_candidates = sorted_df.head(limit)
 
     output_items: List[HybridRecommendItem] = []
+    seen_ids = set()
     for row in top_candidates.itertuples():
+        r_id = str(row.id)
+        if r_id in seen_ids:
+            continue
+        seen_ids.add(r_id)
+
         reasons = getattr(row, 'match_reasons', [])
         explanation_str = " • ".join(reasons[:2]) if reasons else "Gợi ý nổi bật"
+        raw_p = getattr(row, 'price', 50000)
+        clean_p = 50000 if (raw_p is None or pd.isna(raw_p)) else int(raw_p)
 
         output_items.append(
             HybridRecommendItem(
@@ -461,7 +509,7 @@ def recommend_hybrid(request: HybridRecommendRequest) -> HybridRecommendResponse
                 cf_score=float(getattr(row, 'r_cf', 0.0)),
                 env_score=float(getattr(row, 's_env', 1.0)),
                 distance_km=round(float(getattr(row, 'distance_km', 1.0)), 2),
-                price=int(getattr(row, 'price', 50000)),
+                price=clean_p,
                 match_reasons=reasons,
                 explanation=explanation_str
             )

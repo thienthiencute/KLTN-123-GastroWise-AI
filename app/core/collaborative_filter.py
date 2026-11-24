@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Optional, Tuple
 from sklearn.decomposition import TruncatedSVD
+from app.core.rating_normalizer import normalize_rating
 
 EVENT_WEIGHTS = {
     'VIEW': 1.0,
@@ -63,11 +64,12 @@ class CollaborativeFilteringEngine:
                     continue
 
                 weight = EVENT_WEIGHTS.get(e_type, 1.0)
-                # Nếu có rating riêng từ review
+                # Nếu có rating riêng từ review (chuẩn hóa về thang 5)
                 if 'rating' in item and item['rating'] is not None:
                     try:
-                        r_val = float(item['rating'])
-                        weight = max(weight, r_val)
+                        r_val = normalize_rating(item['rating'], default=0.0)
+                        if r_val > 0.0:
+                            weight = max(weight, r_val)
                     except (ValueError, TypeError):
                         pass
 
