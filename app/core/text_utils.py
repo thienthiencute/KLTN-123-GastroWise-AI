@@ -47,6 +47,8 @@ def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
         return 999.0
     try:
         lat1, lon1, lat2, lon2 = map(float, [lat1, lon1, lat2, lon2])
+        if any(math.isnan(x) or math.isinf(x) for x in [lat1, lon1, lat2, lon2]):
+            return 999.0
         R = 6371.0 
         dLat = math.radians(lat2 - lat1)
         dLon = math.radians(lon2 - lon1)

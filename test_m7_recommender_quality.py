@@ -65,6 +65,10 @@ class TestRatingScaleNormalization(unittest.TestCase):
         """Test handling of None, NaN, empty strings, and non-numeric values."""
         self.assertEqual(normalize_rating(None), DEFAULT_NEUTRAL_RATING)
         self.assertEqual(normalize_rating(float('nan')), DEFAULT_NEUTRAL_RATING)
+        self.assertEqual(normalize_rating(float('inf')), DEFAULT_NEUTRAL_RATING)
+        self.assertEqual(normalize_rating(float('-inf')), DEFAULT_NEUTRAL_RATING)
+        self.assertEqual(normalize_rating(True), DEFAULT_NEUTRAL_RATING)
+        self.assertEqual(normalize_rating(False), DEFAULT_NEUTRAL_RATING)
         self.assertEqual(normalize_rating(math.nan), DEFAULT_NEUTRAL_RATING)
         self.assertEqual(normalize_rating(""), DEFAULT_NEUTRAL_RATING)
         self.assertEqual(normalize_rating("N/A"), DEFAULT_NEUTRAL_RATING)
@@ -113,17 +117,54 @@ class TestRatingScaleNormalization(unittest.TestCase):
         self.assertEqual(normalized_doc['rating'], 2.0)
         self.assertEqual(normalized_doc['raw_rating'], 4.0)
 
-        # Case 2: GastroWise user-reviewed restaurant (reviewsCount > 0, avg 4.2)
+        # Case 2: GastroWise user-reviewed restaurant (reviewsCount > 0, avg 4.0)
         user_reviewed_doc = {
             "tenQuan": "Cơm Tấm Ba Ghiền",
-            "diemTrungBinh": 4.2,
+            "diemTrungBinh": 4.0,
             "reviewsCount": 15
         }
         scale_user, raw_user = detect_restaurant_rating_scale(user_reviewed_doc)
         self.assertEqual(scale_user, RatingScale.SCALE_5)
-        self.assertEqual(raw_user, 4.2)
+        self.assertEqual(raw_user, 4.0)
         normalized_user_doc = normalize_restaurant_dict(user_reviewed_doc)
-        self.assertEqual(normalized_user_doc['rating'], 4.2)
+        self.assertEqual(normalized_user_doc['rating'], 4.0)
+
+        # Case 3: Foody 8.0/10 -> 4.0/5 and idempotency when both diemTrungBinh and rating exist
+        foody_8_doc = {
+            "tenQuan": "Phở Hòa",
+            "diemTrungBinh": 8.0,
+            "diemChatLuong": 8.2,
+            "reviewsCount": 0
+        }
+        norm_8 = normalize_restaurant_dict(foody_8_doc)
+        self.assertEqual(norm_8['rating'], 4.0)
+        self.assertEqual(norm_8['raw_rating'], 8.0)
+        # Re-detecting scale on normalized doc must preserve 4.0 and not re-read 8.0
+        scale_recheck, val_recheck = detect_restaurant_rating_scale(norm_8)
+        self.assertEqual(scale_recheck, RatingScale.SCALE_5)
+        self.assertEqual(val_recheck, 4.0)
+
+        # Case 4: Heterogeneous DataFrame NaN handling (reviewsCount=NaN on Foody doc with 4.0/10)
+        foody_nan_rev_doc = {
+            "tenQuan": "Quán Hủ Tiếu",
+            "diemTrungBinh": 4.0,
+            "diemChatLuong": 4.2,
+            "reviewsCount": float('nan')
+        }
+        scale_nan_rev, raw_nan_rev = detect_restaurant_rating_scale(foody_nan_rev_doc)
+        self.assertEqual(scale_nan_rev, RatingScale.SCALE_10)
+        self.assertEqual(normalize_rating(raw_nan_rev, scale=scale_nan_rev), 2.0)
+
+        # Case 5: Non-Foody doc with NaN subscores and reviewsCount=5 must stay SCALE_5
+        gw_nan_sub_doc = {
+            "tenQuan": "Quán Bún Đậu",
+            "diemTrungBinh": 4.0,
+            "diemChatLuong": float('nan'),
+            "reviewsCount": 5
+        }
+        scale_gw_nan, raw_gw_nan = detect_restaurant_rating_scale(gw_nan_sub_doc)
+        self.assertEqual(scale_gw_nan, RatingScale.SCALE_5)
+        self.assertEqual(normalize_rating(raw_gw_nan, scale=scale_gw_nan), 4.0)
 
 
 class TestCv2ImportAndResilience(unittest.TestCase):
@@ -146,6 +187,20 @@ class TestCv2ImportAndResilience(unittest.TestCase):
         result_img = preprocess_image_clahe(test_img)
         self.assertIsNotNone(result_img)
         self.assertEqual(result_img.size, (64, 64))
+
+    def test_main_and_vision_import_without_cv2(self):
+        """Verify that main app and vision_service import and initialize cleanly when cv2 is unavailable."""
+        import importlib
+        import sys
+        import app.core.vision_service as vs
+        with patch.dict(sys.modules, {'cv2': None}):
+            importlib.reload(vs)
+            import main as app_main
+            importlib.reload(app_main)
+            self.assertIsNotNone(app_main.app)
+            self.assertIsNone(vs.cv2)
+        # Restore vision_service cleanly after test
+        importlib.reload(vs)
 
 
 class TestRecommendationQuality(unittest.TestCase):
@@ -248,7 +303,21 @@ class TestRecommendationQuality(unittest.TestCase):
     @patch('app.core.recommender.get_dataset')
     def test_strict_dietary_restrictions_vegetarian(self, mock_get_df):
         """Verify that vegetarian request returns only vegetarian candidates and no meat dishes."""
-        mock_get_df.return_value = self.mock_dataset
+        df_with_meat_mushroom = pd.concat([
+            self.mock_dataset,
+            pd.DataFrame([{
+                "id": "rest_meat_mushroom",
+                "name": "Lẩu Gà Nấm",
+                "tags": "lẩu gà nấm rau củ",
+                "rating": 4.9,
+                "price": 200000,
+                "lat": 10.7770,
+                "lon": 106.7010,
+                "address": "99 Hai Bà Trưng, Quận 1",
+                "district": "Quận 1"
+            }])
+        ], ignore_index=True)
+        mock_get_df.return_value = df_with_meat_mushroom
 
         req = HybridRecommendRequest(
             dietary_exclusions=["chay"],
@@ -257,10 +326,27 @@ class TestRecommendationQuality(unittest.TestCase):
         )
 
         res = recommend_hybrid(req)
-        self.assertGreater(len(res.items), 0)
+        self.assertEqual(len(res.items), 1)
         for item in res.items:
             self.assertIn("chay", item.tags.lower(), f"Item {item.name} must be vegetarian")
+            self.assertNotIn("gà", item.tags.lower())
             self.assertNotIn("lẩu thái", item.tags.lower())
+
+    @patch('app.core.recommender.get_dataset')
+    @patch('app.core.recommender.get_vectorizer')
+    def test_empty_dataset_handling(self, mock_get_vec, mock_get_df):
+        """Verify empty dataset returns valid empty responses for both recommend and recommend_hybrid."""
+        empty_df = pd.DataFrame(columns=['id', 'name', 'tags', 'rating', 'price', 'lat', 'lon', 'district', 'address'])
+        mock_get_df.return_value = empty_df
+        mock_get_vec.return_value = MagicMock()
+
+        res_rec = recommend_restaurants(RecommendRequest(query="phở"))
+        self.assertEqual(res_rec["scores"], [])
+
+        res_hyb = recommend_hybrid(HybridRecommendRequest(user_gps=[10.7769, 106.7009]))
+        self.assertIsInstance(res_hyb, HybridRecommendResponse)
+        self.assertEqual(res_hyb.total, 0)
+        self.assertEqual(res_hyb.items, [])
 
     @patch('app.core.recommender.get_dataset')
     def test_empty_candidate_pool_handling(self, mock_get_df):
@@ -288,19 +374,21 @@ class TestRecommendationQuality(unittest.TestCase):
                 "tags": "cơm sườn chả",
                 "rating": np.nan,  # Missing rating
                 "price": np.nan,   # Missing price
-                "lat": 10.7769,
-                "lon": 106.7009,
+                "lat": np.nan,     # Missing lat
+                "lon": np.nan,     # Missing lon
                 "address": None,
                 "district": None
             }
         ])
         mock_get_df.return_value = df_with_nans
 
-        req = HybridRecommendRequest(user_gps=[10.7769, 106.7009], limit=5)
+        req = HybridRecommendRequest(user_gps=[10.7769, 106.7009], max_price=100000, limit=5)
         res = recommend_hybrid(req)
         self.assertEqual(len(res.items), 1)
         item = res.items[0]
         self.assertFalse(math.isnan(item.score))
+        self.assertFalse(math.isnan(item.distance_km))
+        self.assertEqual(item.distance_km, 999.0)
         self.assertGreaterEqual(item.price, 0)
 
 if __name__ == '__main__':

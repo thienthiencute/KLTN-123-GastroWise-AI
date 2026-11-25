@@ -151,7 +151,7 @@ def recommend_restaurants(request_data: RecommendRequest):
         for exclusion in dietary_exclusions:
             ex_lower = exclusion.strip().lower()
             if 'chay' in ex_lower or 'vegetarian' in ex_lower or 'vegan' in ex_lower:
-                filtered_df = filtered_df[filtered_df['tags'].str.contains('chay|vegan|vegetarian|nấm|rau củ', case=False, na=False)]
+                filtered_df = filtered_df[filtered_df['tags'].str.contains('chay|vegan|vegetarian', case=False, na=False)]
             elif 'không cay' in ex_lower:
                 filtered_df = filtered_df[~filtered_df['tags'].str.contains('cay|sa tế|mì cay|ớt', case=False, na=False)]
             elif 'halal' in ex_lower:
@@ -258,7 +258,10 @@ def recommend_restaurants(request_data: RecommendRequest):
         final_candidates['rating'] = 3.0
 
     final_candidates['distance_km'] = pd.to_numeric(final_candidates['distance_km'], errors='coerce').fillna(999.0)
-    final_candidates['price'] = pd.to_numeric(final_candidates['price'], errors='coerce').fillna(50000).astype(int)
+    if 'price' in final_candidates.columns:
+        final_candidates['price'] = pd.to_numeric(final_candidates['price'], errors='coerce').fillna(50000).astype(int)
+    else:
+        final_candidates['price'] = 50000
 
     # STEP 5: SORTING (Deterministic with secondary & tie-breaker keys)
     sort_by = "relevance"
@@ -373,13 +376,17 @@ def recommend_hybrid(request: HybridRecommendRequest) -> HybridRecommendResponse
     for exclusion in dietary_exclusions:
         ex_clean = exclusion.strip().lower()
         if 'chay' in ex_clean or 'vegetarian' in ex_clean or 'vegan' in ex_clean:
-            current_df = current_df[current_df['tags'].str.contains('chay|vegan|vegetarian|nấm|rau củ', case=False, na=False)]
+            current_df = current_df[current_df['tags'].str.contains('chay|vegan|vegetarian', case=False, na=False)]
         elif 'không cay' in ex_clean:
             current_df = current_df[~current_df['tags'].str.contains('cay|sa tế|mì cay|ớt', case=False, na=False)]
         elif 'halal' in ex_clean:
             current_df = current_df[current_df['tags'].str.contains('halal|muslim', case=False, na=False)]
 
     # 1.2 Price Cap Filter
+    if 'price' in current_df.columns:
+        current_df['price'] = pd.to_numeric(current_df['price'], errors='coerce').fillna(50000)
+    else:
+        current_df['price'] = 50000
     if request.max_price and request.max_price > 0:
         current_df = current_df[current_df['price'] <= request.max_price]
 

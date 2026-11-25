@@ -4,7 +4,7 @@
 - **Target Repository:** `KLTN-123-GastroWise-AI`
 - **Reference Backend Repository:** `KLTN-123-GastroWise-BE` (branch: `fix/m2.3-backend-integration-security`)
 - **Working Branch:** `feature/m7-1-ai-recommender-quality`
-- **Final Verdict:** **`PASS — AI RECOMMENDER QUALITY VERIFIED`** ✅
+- **Final Verdict:** **`PASS — M7.1 VERIFIED`** ✅
 - **Objective:** Audit and improve GastroWise AI recommendation quality, fix rating scale normalization (ISSUE-06), resolve OpenCV import fragility (ISSUE-11), eliminate candidate duplicates, ensure ranking determinism, enforce strict dietary constraint handling, and verify microservice contract compatibility without breaking changes.
 
 ---
@@ -104,51 +104,60 @@ return round(r, 1)
 
 ## 6. Test Suite & Verification Evidence
 
-All tests executed with Python 3.9 in the local virtual environment:
+All tests executed with Python 3.9 in the local virtual environment (`.venv/bin/python -m unittest discover -p "test_*.py" -v`):
 
-### 6.1 Quality & Normalization Tests (`test_m7_recommender_quality.py`)
+### 6.1 Quality, Normalization & Resilience Tests (`test_m7_recommender_quality.py`)
 - `test_ten_point_scale_normalization`: ✅ PASS
 - `test_five_point_scale_preservation`: ✅ PASS
 - `test_auto_detection_scale`: ✅ PASS
-- `test_missing_and_null_ratings`: ✅ PASS
+- `test_missing_and_null_ratings`: ✅ PASS (`None`, `NaN`, `inf`, `-inf`, `bool`, empty string, non-numeric)
 - `test_invalid_and_out_of_range_ratings`: ✅ PASS
 - `test_boundary_values`: ✅ PASS
 - `test_double_normalization_prevention`: ✅ PASS
-- `test_restaurant_doc_scale_detection`: ✅ PASS
+- `test_restaurant_doc_scale_detection`: ✅ PASS (Foody 4.0/10 -> 2.0/5, 8.0/10 -> 4.0/5, GastroWise 4.0/5 -> 4.0/5, heterogeneous pandas `NaN` handling, idempotency)
 - `test_clahe_preprocessing_with_cv2`: ✅ PASS
 - `test_clahe_preprocessing_without_cv2`: ✅ PASS
+- `test_main_and_vision_import_without_cv2`: ✅ PASS
 - `test_deduplication_filters_duplicate_restaurants`: ✅ PASS
 - `test_deterministic_ranking_results`: ✅ PASS
-- `test_strict_dietary_restrictions_vegetarian`: ✅ PASS
+- `test_strict_dietary_restrictions_vegetarian`: ✅ PASS (excludes `"lẩu gà nấm"` / meat dishes with mushroom/vegetables)
 - `test_empty_candidate_pool_handling`: ✅ PASS
-- `test_missing_data_resilience`: ✅ PASS
-**Result:** 15/15 PASS (0.087s)
+- `test_empty_dataset_handling`: ✅ PASS
+- `test_missing_data_resilience`: ✅ PASS (`NaN` rating, price, and coordinates)
+**Result:** 17/17 PASS
 
 ### 6.2 Full Repository Test Execution
 ```bash
-python -m unittest discover -p "test_*.py" -v
+.venv/bin/python -m unittest discover -p "test_*.py" -v
 ```
-- `test_internal_auth.py`: 4/4 PASS
-- `test_m7_recommender_quality.py`: 15/15 PASS
-- `test_routing_contract.py`: 3/3 PASS
-- `test_nlu_copilot.py`: 5/5 PASS
-- `test_hybrid_recommendation.py`: All PASS
-**Total:** 27+ test cases passed with 0 failures, 0 errors.
+- `test_internal_auth.py`: 4/4 PASS (fail-closed `X-Internal-AI-Key` verification)
+- `test_m7_recommender_quality.py`: 17/17 PASS
+- `test_routing_contract.py`: 3/3 PASS (canonical + legacy request compatibility + dual `stops`/`ordered_stops` response)
+**Total:** 24/24 PASS (0 failures, 0 errors, 0 skipped, 2.180s)
 
 ---
 
-## 7. Files Changed
+## 7. Independent Audit & Hardening Fixes (M7.1 Verification)
+
+During independent audit, 4 subtle defects were identified and hardened:
+1. **Vision Service Startup Coupling (`app/core/vision_service.py`):** Top-level `from ultralytics import YOLO` internally triggered `import cv2`, crashing `main.py` when OpenCV was absent. Moved `YOLO` import lazily inside `get_yolo_model()`.
+2. **Pandas `NaN` & Precedence in Rating Scale Detection (`app/core/rating_normalizer.py`):**
+   - `float('nan')` values from heterogeneous MongoDB DataFrames (`to_dict()`) bypassed `is not None` and `or 0` checks in `detect_restaurant_rating_scale`, causing Foody documents with `NaN` `reviewsCount` and rating $\le 5.0$ to fall back to `AUTO`.
+   - When `_rating_normalized=True`, `rating` now takes precedence over `diemTrungBinh`.
+   - Added `bool` rejection in `normalize_rating`.
+3. **NaN Coordinate Propagation & Price Column Guard (`app/core/text_utils.py`, `app/core/recommender.py`):**
+   - `calculate_distance` now guards against `NaN`/`Inf` coordinates (returns `999.0` instead of propagating `NaN` into JSON responses).
+   - `recommend_hybrid` and `recommend_restaurants` safely coerce/default missing `price` columns before `max_price` filtering.
+4. **Strict Vegetarian Filter Hardening (`app/core/recommender.py`):**
+   - Removed `'nấm|rau củ'` from the vegetarian regex `'chay|vegan|vegetarian'` so meat dishes containing mushrooms or vegetables (e.g., `"lẩu gà nấm"`) are never returned for strict vegetarian requests.
 
 | File | Type | Purpose |
 |---|:---:|---|
-| `app/core/rating_normalizer.py` | New | Centralized rating scale normalization, auto-detection, and double normalization prevention |
-| `test_m7_recommender_quality.py` | New | Comprehensive automated unit test suite for M7.1 |
-| `app/db/mongo.py` | Modified | Integrate rating normalizer, preserve `raw_rating` and `raw_rating_scale` |
-| `app/core/collaborative_filter.py` | Modified | Normalize review ratings in interaction training weights |
-| `app/core/route_optimizer.py` | Modified | Normalize candidate stop ratings for consistent TSP candidate prioritization |
-| `app/core/vision_service.py` | Modified | Safe cv2 fallback import and CLAHE resilience |
-| `app/core/recommender.py` | Modified | Deduplication, determinism, dietary strictness, NaN safety, rating quality bonus |
-| `main.py` | Modified | Clean up unused top-level imports |
+| `app/core/rating_normalizer.py` | Modified | Hardened `NaN`/`Inf`/`bool` checks, normalized precedence, and Foody subscore detection |
+| `app/core/vision_service.py` | Modified | Lazy `YOLO` import inside `get_yolo_model()` so service boots without `cv2` |
+| `app/core/text_utils.py` | Modified | Guard `calculate_distance` against `NaN`/`Inf` coordinates |
+| `app/core/recommender.py` | Modified | Strict vegetarian filter + safe `price` column coercion |
+| `test_m7_recommender_quality.py` | Modified | Added regression tests for all confirmed bugs and 12 required scenarios |
 
 ---
 

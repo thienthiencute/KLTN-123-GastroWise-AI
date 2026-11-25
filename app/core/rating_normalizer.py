@@ -51,7 +51,7 @@ def normalize_rating(
         except (ValueError, TypeError):
             return default
 
-    if val is None:
+    if val is None or isinstance(val, bool):
         return default
 
     # Kiểm tra float/nan
@@ -86,20 +86,47 @@ def normalize_rating(
     normalized = max(MIN_RATING, min(MAX_RATING, normalized))
     return round(normalized, 1)
 
+def _has_valid_numeric(val: Any) -> bool:
+    if val is None or isinstance(val, bool):
+        return False
+    try:
+        num = float(val)
+        return not (math.isnan(num) or math.isinf(num))
+    except (ValueError, TypeError):
+        return False
+
+def _safe_nonneg_int(val: Any, default: int = 0) -> int:
+    if val is None or isinstance(val, bool):
+        return default
+    try:
+        num = float(val)
+        if math.isnan(num) or math.isinf(num):
+            return default
+        return max(0, int(num))
+    except (ValueError, TypeError):
+        return default
+
 def detect_restaurant_rating_scale(doc: Dict[str, Any]) -> Tuple[RatingScale, float]:
     """
     Tự động phát hiện thang điểm của bản ghi nhà hàng dựa trên siêu dữ liệu:
-    - Nếu có reviewsCount > 0 và không có điểm thành phần crawler: Thang 5 (do người dùng GastroWise review).
-    - Nếu có điểm thành phần Foody (diemChatLuong, diemViTri, diemPhucVu, urlGoc): Thang 10 ban đầu.
+    - Nếu đã chuẩn hóa (_rating_normalized=True): Ưu tiên đọc rating đã chuẩn hóa [0, 5].
+    - Nếu có reviewsCount > 0: Thang 5 (do người dùng GastroWise review).
+    - Nếu có điểm thành phần Foody (diemChatLuong, diemViTri, diemPhucVu, ...): Thang 10 ban đầu.
     - Nếu diemTrungBinh > 5.0: Chắc chắn thang 10.
     - Trả về (detected_scale, raw_rating).
     """
-    raw_val = doc.get('diemTrungBinh')
-    if raw_val is None:
+    is_already_norm = doc.get('_rating_normalized') is True
+    if is_already_norm:
         raw_val = doc.get('rating')
+        if raw_val is None:
+            raw_val = doc.get('diemTrungBinh')
+    else:
+        raw_val = doc.get('diemTrungBinh')
+        if raw_val is None:
+            raw_val = doc.get('rating')
 
     try:
-        raw_num = float(raw_val) if raw_val is not None else None
+        raw_num = float(raw_val) if (raw_val is not None and not isinstance(raw_val, bool)) else None
     except (ValueError, TypeError):
         raw_num = None
 
@@ -107,18 +134,19 @@ def detect_restaurant_rating_scale(doc: Dict[str, Any]) -> Tuple[RatingScale, fl
         return RatingScale.AUTO, DEFAULT_NEUTRAL_RATING
 
     # Nếu đã đánh dấu đã chuẩn hóa
-    if doc.get('_rating_normalized') is True or doc.get('raw_rating') is not None:
+    if is_already_norm or doc.get('raw_rating') is not None:
         return RatingScale.SCALE_5, raw_num
 
     # Nếu > 5.0 chắc chắn là thang 10
     if raw_num > 5.0:
         return RatingScale.SCALE_10, raw_num
 
-    # Kiểm tra xem có phải dữ liệu Foody crawler không (có điểm thành phần)
+    # Kiểm tra xem có phải dữ liệu Foody crawler không (có điểm thành phần hợp lệ, bỏ qua NaN từ pandas)
     has_foody_subscores = any(
-        doc.get(k) is not None for k in ('diemChatLuong', 'diemViTri', 'diemPhucVu', 'diemGiaCa', 'diemKhongGian')
+        _has_valid_numeric(doc.get(k))
+        for k in ('diemChatLuong', 'diemViTri', 'diemPhucVu', 'diemGiaCa', 'diemKhongGian')
     )
-    reviews_count = doc.get('reviewsCount', 0) or 0
+    reviews_count = _safe_nonneg_int(doc.get('reviewsCount'), default=0)
 
     if has_foody_subscores and reviews_count == 0:
         # Dữ liệu gốc Foody, điểm <= 5.0 (ví dụ 4.0/10) vẫn là thang 10
