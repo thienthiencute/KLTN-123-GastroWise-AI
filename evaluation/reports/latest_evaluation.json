@@ -1,0 +1,524 @@
+{
+  "evaluation": {
+    "dataset": {
+      "name": "gastrowise_synthetic_benchmark_v1",
+      "is_synthetic": true,
+      "seed": 42,
+      "description": "Synthetic multi-profile benchmark simulating Foody 10-point crawled restaurants, GastroWise 5-star user-reviewed restaurants, duplicate records, dietary constraints, budget tiers, and HCMC GPS coordinates.",
+      "limitations": [
+        "Synthetic ground-truth relevance grades reflect domain-rule expectations, not real user clicks/orders.",
+        "Catalog size (24 raw rows, 22 unique restaurants) is smaller than production MongoDB Atlas.",
+        "Collaborative filtering interactions are synthetic fixtures for cold-start vs warm-start verification."
+      ]
+    },
+    "seed": 42,
+    "summary": {
+      "precision@5": {
+        "n": 10,
+        "mean": 0.48,
+        "std": 0.1687,
+        "variance": 0.0284,
+        "min": 0.2,
+        "max": 0.8,
+        "ci_95_low": 0.3755,
+        "ci_95_high": 0.5845
+      },
+      "recall@5": {
+        "n": 10,
+        "mean": 0.6483,
+        "std": 0.2181,
+        "variance": 0.0476,
+        "min": 0.4,
+        "max": 1.0,
+        "ci_95_low": 0.5132,
+        "ci_95_high": 0.7835
+      },
+      "ndcg@5": {
+        "n": 10,
+        "mean": 0.8231,
+        "std": 0.1315,
+        "variance": 0.0173,
+        "min": 0.6119,
+        "max": 1.0,
+        "ci_95_low": 0.7416,
+        "ci_95_high": 0.9046
+      },
+      "precision@10": {
+        "n": 10,
+        "mean": 0.38,
+        "std": 0.1398,
+        "variance": 0.0196,
+        "min": 0.1,
+        "max": 0.6,
+        "ci_95_low": 0.2933,
+        "ci_95_high": 0.4667
+      },
+      "recall@10": {
+        "n": 10,
+        "mean": 0.955,
+        "std": 0.0956,
+        "variance": 0.0091,
+        "min": 0.75,
+        "max": 1.0,
+        "ci_95_low": 0.8957,
+        "ci_95_high": 1.0
+      },
+      "ndcg@10": {
+        "n": 10,
+        "mean": 0.9161,
+        "std": 0.0669,
+        "variance": 0.0045,
+        "min": 0.8146,
+        "max": 1.0,
+        "ci_95_low": 0.8747,
+        "ci_95_high": 0.9576
+      },
+      "map@10": 0.7781,
+      "catalog_coverage": 0.9,
+      "intra_list_diversity": {
+        "n": 10,
+        "mean": 0.7801,
+        "std": 0.2926,
+        "variance": 0.0856,
+        "min": 0.0,
+        "max": 0.9335,
+        "ci_95_low": 0.5987,
+        "ci_95_high": 0.9615
+      },
+      "dietary_violation_rate": {
+        "n": 10,
+        "mean": 0.0,
+        "std": 0.0,
+        "variance": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "ci_95_low": 0.0,
+        "ci_95_high": 0.0
+      }
+    },
+    "cold_vs_warm": {
+      "cold_start": {
+        "count": 8,
+        "ndcg@5_mean": 0.8023,
+        "ndcg@10_mean": 0.905,
+        "recall@10_mean": 0.975
+      },
+      "warm_cf": {
+        "count": 2,
+        "ndcg@5_mean": 0.9066,
+        "ndcg@10_mean": 0.9607,
+        "recall@10_mean": 0.875
+      }
+    },
+    "per_user": [
+      {
+        "user_id": "u_warm_spicy",
+        "label": "Spicy Food Lover (Warm CF)",
+        "is_cold_start": false,
+        "returned_count": 10,
+        "recommended_ids": [
+          "r_spicy_1",
+          "r_spicy_2",
+          "r_veg_1",
+          "r_veg_2",
+          "r_pho_1",
+          "r_sour_2",
+          "r_meat_mushroom",
+          "r_bun_thit_nuong",
+          "r_sweet_1",
+          "r_halal_1"
+        ],
+        "relevant_ids": [
+          "r_spicy_1",
+          "r_spicy_2",
+          "r_sour_2",
+          "r_far_thuduc"
+        ],
+        "precision@5": 0.4,
+        "recall@5": 0.5,
+        "ndcg@5": 0.8553,
+        "precision@10": 0.3,
+        "recall@10": 0.75,
+        "ndcg@10": 0.9354,
+        "ap@10": 0.625,
+        "ild": 0.9028,
+        "dietary_violation_rate": 0.0
+      },
+      {
+        "user_id": "u_veg_strict",
+        "label": "Strict Vegetarian User",
+        "is_cold_start": true,
+        "returned_count": 3,
+        "recommended_ids": [
+          "r_veg_1",
+          "r_veg_2",
+          "r_veg_3"
+        ],
+        "relevant_ids": [
+          "r_veg_1",
+          "r_veg_2",
+          "r_veg_3"
+        ],
+        "precision@5": 0.6,
+        "recall@5": 1.0,
+        "ndcg@5": 1.0,
+        "precision@10": 0.3,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "ap@10": 1.0,
+        "ild": 0.5812,
+        "dietary_violation_rate": 0.0
+      },
+      {
+        "user_id": "u_budget_tight",
+        "label": "Budget-Sensitive Student (<= 50k VND)",
+        "is_cold_start": true,
+        "returned_count": 8,
+        "recommended_ids": [
+          "r_veg_1",
+          "r_veg_3",
+          "r_com_budget",
+          "r_bun_thit_nuong",
+          "r_poor_foody_pho",
+          "r_sweet_1",
+          "r_cafe_bitter",
+          "r_far_thuduc"
+        ],
+        "relevant_ids": [
+          "r_com_budget",
+          "r_bun_thit_nuong",
+          "r_veg_1",
+          "r_sweet_1",
+          "r_veg_3",
+          "r_cafe_bitter"
+        ],
+        "precision@5": 0.8,
+        "recall@5": 0.6667,
+        "ndcg@5": 0.7422,
+        "precision@10": 0.6,
+        "recall@10": 1.0,
+        "ndcg@10": 0.8146,
+        "ap@10": 0.9484,
+        "ild": 0.9335,
+        "dietary_violation_rate": 0.0
+      },
+      {
+        "user_id": "u_gps_nearby",
+        "label": "Nearby Q1 Traditional Noodle Lover",
+        "is_cold_start": true,
+        "returned_count": 10,
+        "recommended_ids": [
+          "r_pho_1",
+          "r_poor_foody_pho",
+          "r_bun_thit_nuong",
+          "r_spicy_2",
+          "r_veg_1",
+          "r_com_1",
+          "r_veg_3",
+          "r_com_budget",
+          "r_far_thuduc",
+          "r_sour_1"
+        ],
+        "relevant_ids": [
+          "r_pho_1",
+          "r_spicy_2",
+          "r_com_budget",
+          "r_bun_thit_nuong"
+        ],
+        "precision@5": 0.6,
+        "recall@5": 0.75,
+        "ndcg@5": 0.838,
+        "precision@10": 0.4,
+        "recall@10": 1.0,
+        "ndcg@10": 0.919,
+        "ap@10": 0.7292,
+        "ild": 0.8759,
+        "dietary_violation_rate": 0.0
+      },
+      {
+        "user_id": "u_multi_taste",
+        "label": "Sweet & Sour Multi-Taste Explorer",
+        "is_cold_start": true,
+        "returned_count": 10,
+        "recommended_ids": [
+          "r_sweet_1",
+          "r_sweet_2",
+          "r_veg_3",
+          "r_veg_1",
+          "r_com_budget",
+          "r_sour_1",
+          "r_veg_2",
+          "r_bun_thit_nuong",
+          "r_sour_2",
+          "r_halal_1"
+        ],
+        "relevant_ids": [
+          "r_sweet_1",
+          "r_sweet_2",
+          "r_sour_1",
+          "r_sour_2",
+          "r_bun_thit_nuong"
+        ],
+        "precision@5": 0.4,
+        "recall@5": 0.4,
+        "ndcg@5": 0.7428,
+        "precision@10": 0.5,
+        "recall@10": 1.0,
+        "ndcg@10": 0.9327,
+        "ap@10": 0.7111,
+        "ild": 0.9209,
+        "dietary_violation_rate": 0.0
+      },
+      {
+        "user_id": "u_cold_zero",
+        "label": "Cold-Start User (0 interactions, Umami)",
+        "is_cold_start": true,
+        "returned_count": 10,
+        "recommended_ids": [
+          "r_pho_1",
+          "r_meat_mushroom",
+          "r_halal_1",
+          "r_poor_foody_pho",
+          "r_veg_2",
+          "r_veg_1",
+          "r_spicy_1",
+          "r_bun_thit_nuong",
+          "r_veg_3",
+          "r_com_budget"
+        ],
+        "relevant_ids": [
+          "r_pho_1",
+          "r_meat_mushroom",
+          "r_com_1",
+          "r_com_budget",
+          "r_halal_1"
+        ],
+        "precision@5": 0.6,
+        "recall@5": 0.6,
+        "ndcg@5": 0.7781,
+        "precision@10": 0.4,
+        "recall@10": 0.8,
+        "ndcg@10": 0.8499,
+        "ap@10": 0.68,
+        "ild": 0.8882,
+        "dietary_violation_rate": 0.0
+      },
+      {
+        "user_id": "u_low_hist",
+        "label": "Low-History User (1 interaction < 2, Cold-Start)",
+        "is_cold_start": true,
+        "returned_count": 10,
+        "recommended_ids": [
+          "r_pho_1",
+          "r_halal_1",
+          "r_poor_foody_pho",
+          "r_veg_2",
+          "r_bun_thit_nuong",
+          "r_veg_1",
+          "r_spicy_2",
+          "r_veg_3",
+          "r_com_1",
+          "r_com_budget"
+        ],
+        "relevant_ids": [
+          "r_pho_1",
+          "r_com_1",
+          "r_com_budget",
+          "r_halal_1"
+        ],
+        "precision@5": 0.4,
+        "recall@5": 0.5,
+        "ndcg@5": 0.705,
+        "precision@10": 0.4,
+        "recall@10": 1.0,
+        "ndcg@10": 0.8686,
+        "ap@10": 0.6833,
+        "ild": 0.8853,
+        "dietary_violation_rate": 0.0
+      },
+      {
+        "user_id": "u_warm_sweet",
+        "label": "Dessert & Refreshing Food Lover (Warm CF)",
+        "is_cold_start": false,
+        "returned_count": 10,
+        "recommended_ids": [
+          "r_sweet_1",
+          "r_sweet_2",
+          "r_veg_1",
+          "r_pho_1",
+          "r_veg_3",
+          "r_spicy_2",
+          "r_bun_thit_nuong",
+          "r_com_budget",
+          "r_poor_foody_pho",
+          "r_com_1"
+        ],
+        "relevant_ids": [
+          "r_sweet_1",
+          "r_sweet_2",
+          "r_bun_thit_nuong"
+        ],
+        "precision@5": 0.4,
+        "recall@5": 0.6667,
+        "ndcg@5": 0.958,
+        "precision@10": 0.3,
+        "recall@10": 1.0,
+        "ndcg@10": 0.986,
+        "ap@10": 0.8095,
+        "ild": 0.9174,
+        "dietary_violation_rate": 0.0
+      },
+      {
+        "user_id": "u_non_spicy",
+        "label": "Non-Spicy Preference User",
+        "is_cold_start": true,
+        "returned_count": 10,
+        "recommended_ids": [
+          "r_pho_1",
+          "r_halal_1",
+          "r_poor_foody_pho",
+          "r_veg_2",
+          "r_veg_1",
+          "r_bun_thit_nuong",
+          "r_com_budget",
+          "r_veg_3",
+          "r_sour_1",
+          "r_com_1"
+        ],
+        "relevant_ids": [
+          "r_pho_1",
+          "r_com_budget",
+          "r_bun_thit_nuong",
+          "r_com_1",
+          "r_veg_1"
+        ],
+        "precision@5": 0.4,
+        "recall@5": 0.4,
+        "ndcg@5": 0.6119,
+        "precision@10": 0.5,
+        "recall@10": 1.0,
+        "ndcg@10": 0.8551,
+        "ap@10": 0.5943,
+        "ild": 0.8957,
+        "dietary_violation_rate": 0.0
+      },
+      {
+        "user_id": "u_halal_user",
+        "label": "Halal Dietary Restriction User",
+        "is_cold_start": true,
+        "returned_count": 1,
+        "recommended_ids": [
+          "r_halal_1"
+        ],
+        "relevant_ids": [
+          "r_halal_1"
+        ],
+        "precision@5": 0.2,
+        "recall@5": 1.0,
+        "ndcg@5": 1.0,
+        "precision@10": 0.1,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "ap@10": 1.0,
+        "ild": 0.0,
+        "dietary_violation_rate": 0.0
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "scenario": "1. User prefers spicy food",
+      "passed": true,
+      "top_3": [
+        "r_spicy_1",
+        "r_spicy_2",
+        "r_veg_1"
+      ],
+      "details": "Top item: Lẩu Thái Khun Thai (score=0.9441)"
+    },
+    {
+      "scenario": "2. User prefers vegetarian food",
+      "passed": true,
+      "top_3": [
+        "r_veg_1",
+        "r_veg_2",
+        "r_veg_3"
+      ],
+      "details": "Returned 3 vegetarian items, violation_rate=0.0"
+    },
+    {
+      "scenario": "3. User has strict maximum budget (<= 50,000 VND)",
+      "passed": true,
+      "top_3": [
+        "r_veg_1",
+        "r_sweet_1",
+        "r_com_budget"
+      ],
+      "details": "Returned 8 items, max returned price=50000"
+    },
+    {
+      "scenario": "4. User wants restaurants near GPS location",
+      "passed": true,
+      "top_3": [
+        "r_pho_1",
+        "r_meat_mushroom",
+        "r_halal_1"
+      ],
+      "details": "Max distance in top-5: 0.33 km"
+    },
+    {
+      "scenario": "5. User has multiple taste preferences",
+      "passed": true,
+      "top_3": [
+        "r_sweet_1",
+        "r_sweet_2",
+        "r_veg_1"
+      ],
+      "details": "Top item: Chè Khúc Bạch Thanh (taste_score=0.852)"
+    },
+    {
+      "scenario": "6. User has no historical interactions (0)",
+      "passed": true,
+      "top_3": [
+        "r_pho_1",
+        "r_meat_mushroom",
+        "r_halal_1"
+      ],
+      "details": "is_cold_start=True, weights={'w1_taste': 0.65, 'w2_cf': 0.0, 'w3_env': 0.35, 'lambda_dist': 0.12}"
+    },
+    {
+      "scenario": "7. User has fewer than two interactions (1)",
+      "passed": true,
+      "top_3": [
+        "r_pho_1",
+        "r_meat_mushroom",
+        "r_halal_1"
+      ],
+      "details": "is_cold_start=True, weights={'w1_taste': 0.65, 'w2_cf': 0.0, 'w3_env': 0.35, 'lambda_dist': 0.12}"
+    },
+    {
+      "scenario": "8. User has sufficient CF history (>= 2)",
+      "passed": true,
+      "top_3": [
+        "r_spicy_1",
+        "r_veg_1",
+        "r_spicy_2"
+      ],
+      "details": "is_cold_start=False, top_cf_score=0.741"
+    },
+    {
+      "scenario": "9. No restaurant satisfies all hard constraints",
+      "passed": true,
+      "top_3": [],
+      "details": "total=0, items=0"
+    },
+    {
+      "scenario": "10. Dataset contains missing or invalid values",
+      "passed": true,
+      "top_3": [
+        "r_nan_1"
+      ],
+      "details": "price=50000, distance_km=999.0, score=-0.1189"
+    }
+  ]
+}
