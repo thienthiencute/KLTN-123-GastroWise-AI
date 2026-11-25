@@ -1,0 +1,460 @@
+{
+  "paths": {
+    "/": [
+      "get"
+    ],
+    "/analyze-sentiment": [
+      "post"
+    ],
+    "/cf/train": [
+      "post"
+    ],
+    "/chat": [
+      "post"
+    ],
+    "/copilot/message": [
+      "post"
+    ],
+    "/predict-food": [
+      "post"
+    ],
+    "/recommend": [
+      "post"
+    ],
+    "/recommend/hybrid": [
+      "post"
+    ],
+    "/routes/optimize": [
+      "post"
+    ],
+    "/sentiment": [
+      "post"
+    ],
+    "/v1/copilot/message": [
+      "post"
+    ],
+    "/v1/recommendation/cf/train": [
+      "post"
+    ],
+    "/v1/recommendation/chat": [
+      "post"
+    ],
+    "/v1/recommendation/recommend": [
+      "post"
+    ],
+    "/v1/recommendation/recommend/hybrid": [
+      "post"
+    ],
+    "/weather-recommend": [
+      "post"
+    ]
+  },
+  "schemas": {
+    "AdvancedSentimentResponse": {
+      "required": [
+        "hashtags",
+        "label",
+        "score"
+      ],
+      "properties": [
+        "hashtags",
+        "label",
+        "score"
+      ]
+    },
+    "Body_handle_predict_food_predict_food_post": {
+      "required": [
+        "file"
+      ],
+      "properties": [
+        "file"
+      ]
+    },
+    "BoundingBox": {
+      "required": [
+        "x1",
+        "x2",
+        "y1",
+        "y2"
+      ],
+      "properties": [
+        "x1",
+        "x2",
+        "y1",
+        "y2"
+      ]
+    },
+    "CandidateStop": {
+      "required": [
+        "id",
+        "lat",
+        "lon",
+        "name"
+      ],
+      "properties": [
+        "avg_price",
+        "close_time",
+        "dining_duration_mins",
+        "district",
+        "id",
+        "lat",
+        "lon",
+        "meal_type",
+        "name",
+        "open_time",
+        "rating",
+        "tags"
+      ]
+    },
+    "ChatRequest": {
+      "required": [
+        "message"
+      ],
+      "properties": [
+        "message",
+        "taste_vector",
+        "user_gps"
+      ]
+    },
+    "ChatResponse": {
+      "required": [
+        "data",
+        "reply_text"
+      ],
+      "properties": [
+        "data",
+        "reply_text"
+      ]
+    },
+    "CopilotChatRequest": {
+      "required": [
+        "message"
+      ],
+      "properties": [
+        "message",
+        "taste_vector",
+        "user_gps"
+      ]
+    },
+    "CopilotChatResponse": {
+      "required": [
+        "entities",
+        "intent",
+        "reply"
+      ],
+      "properties": [
+        "action_card",
+        "entities",
+        "intent",
+        "reply",
+        "results"
+      ]
+    },
+    "FoodDetectionItem": {
+      "required": [
+        "confidence",
+        "food_name",
+        "vietnamese_name"
+      ],
+      "properties": [
+        "bbox",
+        "confidence",
+        "food_name",
+        "nutrition",
+        "vietnamese_name"
+      ]
+    },
+    "HTTPValidationError": {
+      "required": [],
+      "properties": [
+        "detail"
+      ]
+    },
+    "HybridRecommendItem": {
+      "required": [
+        "cf_score",
+        "distance_km",
+        "env_score",
+        "explanation",
+        "id",
+        "match_reasons",
+        "name",
+        "price",
+        "score",
+        "tags",
+        "taste_score"
+      ],
+      "properties": [
+        "cf_score",
+        "distance_km",
+        "env_score",
+        "explanation",
+        "id",
+        "match_reasons",
+        "name",
+        "price",
+        "score",
+        "tags",
+        "taste_score"
+      ]
+    },
+    "HybridRecommendRequest": {
+      "required": [],
+      "properties": [
+        "dietary_exclusions",
+        "limit",
+        "max_price",
+        "taste_vector",
+        "temperature",
+        "user_gps",
+        "user_id",
+        "weather_type"
+      ]
+    },
+    "HybridRecommendResponse": {
+      "required": [
+        "applied_weights",
+        "is_cold_start",
+        "items",
+        "total"
+      ],
+      "properties": [
+        "applied_weights",
+        "is_cold_start",
+        "items",
+        "total"
+      ]
+    },
+    "NutritionInfo": {
+      "required": [
+        "calories",
+        "carbs_g",
+        "fat_g",
+        "protein_g",
+        "serving_desc"
+      ],
+      "properties": [
+        "calories",
+        "carbs_g",
+        "fat_g",
+        "protein_g",
+        "serving_desc"
+      ]
+    },
+    "OptimizedStop": {
+      "required": [
+        "arrival_time",
+        "departure_time",
+        "dining_duration_mins",
+        "distance_to_next_km",
+        "estimated_cost",
+        "id",
+        "lat",
+        "lon",
+        "meal_type",
+        "name",
+        "order_index",
+        "transit_time_mins"
+      ],
+      "properties": [
+        "arrival_time",
+        "departure_time",
+        "dining_duration_mins",
+        "distance_to_next_km",
+        "estimated_cost",
+        "id",
+        "lat",
+        "lon",
+        "meal_type",
+        "name",
+        "order_index",
+        "tags",
+        "transit_time_mins"
+      ]
+    },
+    "RecommendRequest": {
+      "required": [
+        "query"
+      ],
+      "properties": [
+        "candidate_ids",
+        "city_filter",
+        "dietary_exclusions",
+        "query",
+        "taste_vector",
+        "user_gps"
+      ]
+    },
+    "RecommendResponse": {
+      "required": [
+        "scores",
+        "sort_by"
+      ],
+      "properties": [
+        "scores",
+        "sort_by"
+      ]
+    },
+    "RouteOptimizeRequest": {
+      "required": [
+        "candidates",
+        "start_location"
+      ],
+      "properties": [
+        "budget",
+        "candidates",
+        "desired_stops",
+        "max_duration_mins",
+        "routing_mode",
+        "start_location",
+        "start_time_mins"
+      ]
+    },
+    "RouteOptimizeResponse": {
+      "required": [
+        "co2_saved_kg",
+        "message",
+        "remaining_budget",
+        "status",
+        "stops",
+        "total_cost",
+        "total_distance_km",
+        "total_duration_mins"
+      ],
+      "properties": [
+        "algorithm_used",
+        "co2_saved_kg",
+        "message",
+        "ordered_stops",
+        "remaining_budget",
+        "routing_mode",
+        "status",
+        "stops",
+        "total_cost",
+        "total_distance_km",
+        "total_duration_mins"
+      ]
+    },
+    "SentimentRequest": {
+      "required": [
+        "review"
+      ],
+      "properties": [
+        "review"
+      ]
+    },
+    "SentimentResponse": {
+      "required": [
+        "label",
+        "score"
+      ],
+      "properties": [
+        "label",
+        "score"
+      ]
+    },
+    "TasteScore": {
+      "required": [
+        "S_taste",
+        "distance_km",
+        "id",
+        "name",
+        "price",
+        "tags"
+      ],
+      "properties": [
+        "S_taste",
+        "distance_km",
+        "explanation",
+        "id",
+        "name",
+        "price",
+        "tags"
+      ]
+    },
+    "TrainCFRequest": {
+      "required": [
+        "interactions"
+      ],
+      "properties": [
+        "interactions"
+      ]
+    },
+    "TrainCFResponse": {
+      "required": [
+        "item_count",
+        "message",
+        "success",
+        "user_count"
+      ],
+      "properties": [
+        "item_count",
+        "message",
+        "success",
+        "user_count"
+      ]
+    },
+    "ValidationError": {
+      "required": [
+        "loc",
+        "msg",
+        "type"
+      ],
+      "properties": [
+        "ctx",
+        "input",
+        "loc",
+        "msg",
+        "type"
+      ]
+    },
+    "VisionPredictResponse": {
+      "required": [],
+      "properties": [
+        "confidence",
+        "detections",
+        "food_name",
+        "is_confident",
+        "message",
+        "nutrition",
+        "original_name"
+      ]
+    },
+    "WeatherInfo": {
+      "required": [
+        "banner_desc",
+        "banner_title",
+        "condition_code",
+        "condition_text",
+        "temperature",
+        "weather_type"
+      ],
+      "properties": [
+        "banner_desc",
+        "banner_title",
+        "condition_code",
+        "condition_text",
+        "temperature",
+        "weather_type"
+      ]
+    },
+    "WeatherRecommendRequest": {
+      "required": [],
+      "properties": [
+        "temperature",
+        "user_gps",
+        "weather_condition"
+      ]
+    },
+    "WeatherRecommendResponse": {
+      "required": [
+        "scores",
+        "weather"
+      ],
+      "properties": [
+        "scores",
+        "weather"
+      ]
+    }
+  }
+}
