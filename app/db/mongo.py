@@ -4,6 +4,7 @@ from pymongo import MongoClient
 from sklearn.feature_extraction.text import TfidfVectorizer
 from app.config import MONGO_URI, DB_NAME, COLLECTION_NAME
 from app.core.text_utils import clean_coordinate, clean_price, extract_district_from_address
+from app.core.rating_normalizer import detect_restaurant_rating_scale, normalize_rating
 
 # Global dataset & model state
 df = None
@@ -55,19 +56,21 @@ def load_dataset_from_mongo():
         else:
             temp_df = pd.DataFrame(data_list)
             temp_df['id'] = temp_df['_id'].astype(str)
+            # [TASK-IMP-02 / ISSUE-06] Chuẩn hóa điểm Foody thang 10 & Review thang 5 nhất quán, lưu raw_rating
+            raw_ratings = []
+            normalized_ratings = []
+            for _, r in temp_df.iterrows():
+                r_dict = r.to_dict()
+                scale, raw_val = detect_restaurant_rating_scale(r_dict)
+                norm_val = normalize_rating(raw_val, scale=scale)
+                raw_ratings.append(raw_val)
+                normalized_ratings.append(norm_val)
+
             rename_map = {'tenQuan': 'name', 'diemTrungBinh': 'rating', 'giaCa': 'price', 'diaChi': 'address'}
             temp_df.rename(columns=rename_map, inplace=True)
-            
-            # [TASK-IMP-02 / P1-001] Chuẩn hóa điểm Foody thang 10 về thang 5 sao tối đa
-            def normalize_rating(val):
-                try:
-                    r = float(val)
-                    if r > 5.0:
-                        return round(r / 2.0, 1)
-                    return round(r, 1)
-                except (ValueError, TypeError):
-                    return 3.0
-            temp_df['rating'] = temp_df['rating'].apply(normalize_rating)
+            temp_df['raw_rating'] = raw_ratings
+            temp_df['rating'] = normalized_ratings
+            temp_df['_rating_normalized'] = True
             
             temp_df['tags'] = temp_df['tags'].apply(lambda x: " ".join(x) if isinstance(x, list) else str(x)).fillna('')
             

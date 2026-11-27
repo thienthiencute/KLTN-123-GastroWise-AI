@@ -1,6 +1,7 @@
 import math
 from typing import List, Dict, Any, Tuple, Optional
 from app.schemas.routing import RouteOptimizeRequest, RouteOptimizeResponse, OptimizedStop, CandidateStop
+from app.core.rating_normalizer import normalize_rating
 
 # Hệ số phát thải CO2 trung bình đô thị Việt Nam (kg CO2 / km)
 # 75% xe máy @ 0.082 kg/km + 25% ô tô @ 0.171 kg/km = 0.104 kg CO2/km
@@ -79,7 +80,7 @@ def select_best_candidates(
     for k in groups:
         groups[k].sort(
             key=lambda c: (
-                -(c.rating or 4.0),
+                -(normalize_rating(c.rating, default=4.0)),
                 haversine_distance_km(start_lat, start_lon, c.lat, c.lon)
             )
         )
@@ -118,7 +119,7 @@ def select_best_candidates(
     remaining = [c for c in valid_pool if c not in selected]
     remaining.sort(
         key=lambda c: (
-            -(c.rating or 4.0),
+            -(normalize_rating(c.rating, default=4.0)),
             haversine_distance_km(start_lat, start_lon, c.lat, c.lon)
         )
     )
@@ -245,7 +246,7 @@ def solve_greedy_gastronomic(
         key=lambda c: (
             meal_order_weight.get(c.meal_type or 'main', 2),
             haversine_distance_km(curr_lat, curr_lon, c.lat, c.lon),
-            -(c.rating or 4.0)
+            -(normalize_rating(c.rating, default=4.0))
         )
     )
 

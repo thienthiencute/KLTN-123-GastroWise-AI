@@ -3,8 +3,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.mongo import load_dataset_from_mongo, get_dataset
 from app.api.v1.router import api_v1_router
-from app.core.sentiment_service import get_sentiment_pipeline
-from app.core.vision_service import get_yolo_model
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
