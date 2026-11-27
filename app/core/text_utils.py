@@ -2,18 +2,33 @@ import math
 from app.config import LOCATION_NAMES, EN_VI_MAPPING
 
 def clean_coordinate(val):
-    try:
-        if isinstance(val, (int, float)): 
-            return float(val)
-        if isinstance(val, str): 
-            return float(val.replace(',', '.'))
+    if val is None or isinstance(val, bool):
         return 0.0
+    try:
+        if isinstance(val, (int, float)):
+            num = float(val)
+        elif isinstance(val, str):
+            num = float(val.strip().replace(',', '.'))
+        else:
+            return 0.0
+        if math.isnan(num) or math.isinf(num):
+            return 0.0
+        return num
     except Exception:
         return 0.0
 
 def clean_price(val):
+    if val is None or isinstance(val, bool):
+        return 0.0
     try:
-        s = str(val)
+        if isinstance(val, (int, float)):
+            num = float(val)
+            if math.isnan(num) or math.isinf(num) or num < 0:
+                return 0.0
+            return num
+        s = str(val).strip()
+        if s.startswith('-'):
+            return 0.0
         clean_s = ''.join(filter(str.isdigit, s))
         if clean_s:
             return float(clean_s)

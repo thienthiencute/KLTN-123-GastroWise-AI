@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+from typing import Optional
+from urllib.parse import quote_plus
 
 # --- LOAD ENVIRONMENT VARIABLES (.env) ---
 # [TASK-SEC-01] Ensure .env is loaded safely without hardcoded secrets
@@ -21,11 +23,32 @@ if _env_path.is_file():
                         os.environ[_k] = _v
 
 # --- MONGODB CONFIG ---
-# [TASK-SEC-01] Remediated: Never hardcode database credentials.
-# Require MONGODB_URI via environment variables (.env or system env)
-MONGO_URI = os.getenv("MONGODB_URI")
-DB_NAME = os.getenv("MONGODB_DB_NAME", "gastrowise")
+# [TASK-SEC-01 / M9.4] Remediated: Never hardcode database credentials.
+# Align default database to Core Service catalog database (`gastro_core`).
+DB_NAME = os.getenv("MONGODB_DB_NAME", "gastro_core")
 COLLECTION_NAME = os.getenv("MONGODB_COLLECTION_NAME", "restaurants")
+
+
+def build_mongo_uri_from_env() -> Optional[str]:
+    """Resolve explicit MONGODB_URI or build an encoded authSource URI from discrete env vars."""
+    explicit_uri = os.getenv("MONGODB_URI")
+    if explicit_uri and explicit_uri.strip():
+        return explicit_uri.strip()
+
+    user = os.getenv("AI_DB_USER")
+    password = os.getenv("AI_DB_PASSWORD")
+    if user and password:
+        host = os.getenv("MONGO_HOST", "mongo-test").strip() or "mongo-test"
+        port = os.getenv("MONGO_PORT", "27017").strip() or "27017"
+        auth_source = (os.getenv("MONGO_AUTH_SOURCE") or DB_NAME).strip() or DB_NAME
+        return (
+            f"mongodb://{quote_plus(user.strip())}:{quote_plus(password.strip())}"
+            f"@{host}:{port}/{quote_plus(DB_NAME)}?authSource={quote_plus(auth_source)}"
+        )
+    return None
+
+
+MONGO_URI = build_mongo_uri_from_env()
 
 # --- TAG KNOWLEDGE BASE ---
 TAG_KNOWLEDGE_BASE = {

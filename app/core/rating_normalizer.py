@@ -137,6 +137,13 @@ def detect_restaurant_rating_scale(doc: Dict[str, Any]) -> Tuple[RatingScale, fl
     if is_already_norm or doc.get('raw_rating') is not None:
         return RatingScale.SCALE_5, raw_num
 
+    # Nếu document ghi rõ metadata ratingScale (từ Core / Migration)
+    explicit_scale = doc.get('ratingScale') or doc.get('raw_rating_scale')
+    if isinstance(explicit_scale, str):
+        resolved_explicit = _resolve_scale(explicit_scale)
+        if resolved_explicit != RatingScale.AUTO:
+            return resolved_explicit, raw_num
+
     # Nếu > 5.0 chắc chắn là thang 10
     if raw_num > 5.0:
         return RatingScale.SCALE_10, raw_num
